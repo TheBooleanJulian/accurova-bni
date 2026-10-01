@@ -4,8 +4,10 @@ A single page listing every BNI event gallery (LuxSync-backed Google Drive
 folders) with a search bar, plus an admin dashboard to add/edit/remove
 galleries. Same function as [xymiku-site](../xymiku-site)'s gallery
 archive + admin dashboard (`app/gallery`, `app/admin`), built as a
-dependency-free static site instead of a Next.js app — no npm install or
-build step.
+dependency-free static site instead of a Next.js app. Locally there's no
+npm install or build step; the only build step that exists
+(`scripts/write-config.js`) runs on Zeabur to inject env vars into
+`config.js` so the Supabase URL/key never need to be committed.
 
 ## How it works
 
@@ -64,15 +66,23 @@ LuxSync gallery page, regardless of what External URL holds.
 
 ## Deployment
 
-Static site — Zeabur auto-detects and serves this folder with no build
-step or `zeabur.json` needed, consistent with the other static-HTML tools
-in this workspace (e.g. `juliancheung-landing`).
+Zeabur Git-connected service, tracking `main`. `config.js` is gitignored
+(it's per-deployment and the repo should stay portable), so instead
+`scripts/write-config.js` runs as the Zeabur build step (`npm run build`,
+see `package.json`) and writes `config.js` from this service's environment
+variables right before the static files are served.
 
-`config.js` is gitignored since it holds a specific Supabase project's
-values. Set it up on the deploy target the same way as locally (step 4
-above) — upload it directly, or rely on Zeabur's file-based deploy to carry
-it over from the repo if you decide to commit per-environment config
-instead.
+Set these in the Zeabur dashboard (service → Variables):
+
+| Variable | Required | Notes |
+|---|---|---|
+| `SUPABASE_URL` | yes | From Supabase project settings → API |
+| `SUPABASE_ANON_KEY` | yes | The publishable/anon key — safe to expose client-side |
+| `LUXSYNC_URL` | no | Defaults to the shared `luxsync-v3` instance |
+
+The build fails loudly (non-zero exit) if `SUPABASE_URL` or
+`SUPABASE_ANON_KEY` is missing, so a misconfigured service won't silently
+deploy a broken site.
 
 ## Dependencies
 
@@ -81,4 +91,6 @@ instead.
   in the fleet (xymiku-site), not a new dependency to maintain.
 - Google Fonts (Space Grotesk, JetBrains Mono) per the global design system.
 
-No other dependencies, frameworks, or build tooling.
+No runtime frameworks. `package.json` exists only to give Zeabur a `build`
+script to run (`scripts/write-config.js`, stdlib Node, no dependencies) —
+it's not installing or bundling anything.

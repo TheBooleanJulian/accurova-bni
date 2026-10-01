@@ -1,0 +1,8 @@
+{
+  "name": "accurova-bni",
+  "private": true,
+  "description": "Accurova BNI gallery hub — static site, no runtime dependencies. This package.json exists only so Zeabur runs a build step that injects env vars into config.js.",
+  "scripts": {
+    "build": "node scripts/write-config.js"
+  }
+}
