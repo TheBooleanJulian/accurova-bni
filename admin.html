@@ -15,7 +15,7 @@
 
   <script type="module">
     import { supabase } from "./assets/supabase-client.js";
-    import { driveThumbUrl } from "./assets/luxsync.js";
+    import { driveThumbUrl, listDriveFolder } from "./assets/luxsync.js";
 
     const app = document.getElementById("app");
 
@@ -176,6 +176,7 @@
         <thead>
           <tr>
             <th>ID</th><th>Name</th><th>Date</th><th>Status</th><th>Drive folder</th>
+            <th>Images</th>
             <th>Cover file</th><th>External URL</th><th>Crop</th><th># override</th><th></th>
           </tr>
         </thead>
@@ -197,6 +198,7 @@
         <td>${escapeHtml(row.gallery_date)}</td>
         <td>${escapeHtml(row.status)}</td>
         <td>${escapeHtml(row.drive_folder_id || "—")}</td>
+        <td class="image-count">${row.drive_folder_id ? "…" : (row.image_count_override ?? "—")}</td>
         <td>${escapeHtml(row.cover_drive_file_id || "—")}</td>
         <td>${escapeHtml(row.external_url || "—")}</td>
         <td>${escapeHtml(row.cover_position)}</td>
@@ -216,6 +218,17 @@
         }
         loadRows();
       });
+      if (row.drive_folder_id) {
+        const countCell = tr.querySelector(".image-count");
+        listDriveFolder(row.drive_folder_id)
+          .then(({ files }) => {
+            countCell.textContent = files.length.toLocaleString();
+          })
+          .catch((err) => {
+            countCell.textContent = "error";
+            console.error(`image count fetch failed for gallery ${row.id}`, err);
+          });
+      }
       return tr;
     }
 
@@ -238,9 +251,34 @@
       idTd.className = "mono";
       tr.appendChild(idTd);
 
-      const fields = ["name", "gallery_date", "status", "drive_folder_id", "cover_drive_file_id", "external_url", "cover_position", "image_count_override"];
+      const fieldsBeforeImages = ["name", "gallery_date", "status", "drive_folder_id"];
+      const fieldsAfterImages = ["cover_drive_file_id", "external_url", "cover_position", "image_count_override"];
       const inputs = {};
-      for (const field of fields) {
+      for (const field of fieldsBeforeImages) {
+        const td = document.createElement("td");
+        const el = buildFieldInput(field, draft[field]);
+        inputs[field] = el;
+        td.appendChild(el);
+        tr.appendChild(td);
+      }
+
+      // Images isn't a stored/editable field — it's the live Drive folder
+      // count, same as the read-only row, just not updatable here.
+      const imageCountTd = document.createElement("td");
+      imageCountTd.textContent = row.drive_folder_id ? "…" : "—";
+      tr.appendChild(imageCountTd);
+      if (row.drive_folder_id) {
+        listDriveFolder(row.drive_folder_id)
+          .then(({ files }) => {
+            imageCountTd.textContent = files.length.toLocaleString();
+          })
+          .catch((err) => {
+            imageCountTd.textContent = "error";
+            console.error(`image count fetch failed for gallery ${row.id}`, err);
+          });
+      }
+
+      for (const field of fieldsAfterImages) {
         const td = document.createElement("td");
         const el = buildFieldInput(field, draft[field]);
         inputs[field] = el;

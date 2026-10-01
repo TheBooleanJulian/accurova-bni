@@ -6,21 +6,32 @@ galleries. Same function as [xymiku-site](../xymiku-site)'s gallery
 archive + admin dashboard (`app/gallery`, `app/admin`), built as a
 dependency-free static site instead of a Next.js app. Locally there's no
 npm install or build step; the only build step that exists
-(`scripts/write-config.js`) runs on Zeabur to inject env vars into
-`config.js` so the Supabase URL/key never need to be committed.
+(`scripts/build.js`) runs on Zeabur to inject env vars into `dist/config.js`
+so the Supabase URL/key never need to be committed.
+
+Styled white/red (BNI brand) rather than the dark void/teal global design
+system — a deliberate per-project deviation.
 
 ## How it works
 
 - **`index.html`** — public hub. Loads every row from the `galleries`
   Supabase table, renders a searchable grid of cards, and links each card to
   its LuxSync gallery page (lightbox/download built in) or an external URL.
+  For galleries backed by a Drive folder, the image count loads in the
+  background after the initial render (4-at-a-time) and fills in per card as
+  it arrives, rather than blocking the page on it.
 - **`admin.html`** — password-gated dashboard (Supabase Auth) with a form to
-  add galleries and a table to edit/delete existing ones.
+  add galleries and a table to edit/delete existing ones. The ID field
+  auto-fills a slug from Name until edited by hand, and the table's Images
+  column shows each Drive-backed gallery's live photo count.
 - **`assets/luxsync.js`** — talks to the shared [LuxSync](https://github.com/TheBooleanJulian/luxsync-v3)
-  instance for thumbnails and the gallery page URL. This hub never stores or
-  serves photo bytes itself.
+  instance for thumbnails, the gallery page URL, and (via `listDriveFolder`)
+  live image counts. This hub never stores or serves photo bytes itself.
 - **`assets/supabase-client.js` / `assets/galleries.js`** — thin Supabase
   client + row-to-view mapping, mirroring `xymiku-site/lib/data.ts`.
+  `galleries.js` also exports `loadImageCounts()`, the concurrency-capped
+  background fetch index.html uses (LuxSync's `/api/gallery` is rate-limited
+  to 20/min, hence the cap rather than firing every request at once).
 - **`supabase-schema.sql`** — the `galleries` table + row-level-security
   policies (public read, admin-only write).
 

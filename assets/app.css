@@ -1,16 +1,17 @@
 /* Shared styling for the Accurova BNI gallery hub + admin dashboard.
-   Tokens follow the global design system in AGENTS.md (void/surface/teal/gold). */
+   White/red theme (BNI brand), deviating from the dark void/teal global
+   design system by explicit request for this project. */
 
 :root {
-  --void: #050508;
-  --surface: #0a0e14;
-  --teal: #00d4c8;
-  --gold: #f5c842;
-  --ink: #e8ecf1;
-  --mute: #7a8694;
-  --border: rgba(0, 212, 200, 0.18);
-  --border-strong: rgba(0, 212, 200, 0.45);
-  --danger: #f56a6a;
+  --void: #ffffff;
+  --surface: #f6f6f7;
+  --red: #e4002b;
+  --gold: #b45309;
+  --ink: #16181c;
+  --mute: #6b7280;
+  --border: rgba(228, 0, 43, 0.18);
+  --border-strong: rgba(228, 0, 43, 0.45);
+  --danger: #b91c1c;
 }
 
 * {
@@ -64,7 +65,7 @@ header.site-header {
   font-family: "JetBrains Mono", monospace;
   font-size: 0.7rem;
   letter-spacing: 0.3em;
-  color: var(--teal);
+  color: var(--red);
   text-transform: uppercase;
 }
 
@@ -84,7 +85,7 @@ h1 {
 .header-actions a {
   display: inline-block;
   border: 1px solid var(--border-strong);
-  color: var(--teal);
+  color: var(--red);
   padding: 0.5rem 1rem;
   font-size: 0.75rem;
   letter-spacing: 0.1em;
@@ -92,7 +93,7 @@ h1 {
 }
 
 .header-actions a:hover {
-  background: rgba(0, 212, 200, 0.08);
+  background: rgba(228, 0, 43, 0.06);
 }
 
 .search-bar {
@@ -115,7 +116,7 @@ h1 {
 }
 
 .search-bar input:focus {
-  border-color: var(--teal);
+  border-color: var(--red);
 }
 
 .count-line {
@@ -136,7 +137,7 @@ h1 {
   display: block;
   text-decoration: none;
   border: 1px solid var(--border);
-  background: rgba(10, 14, 20, 0.6);
+  background: var(--surface);
   transition: border-color 0.15s ease;
 }
 
@@ -155,6 +156,7 @@ h1 {
   color: var(--mute);
   font-size: 0.7rem;
   letter-spacing: 0.1em;
+  border-bottom: 1px solid var(--border);
 }
 
 .card-body {
@@ -188,11 +190,11 @@ h1 {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: var(--teal);
+  background: var(--red);
 }
 
 .status-online {
-  color: var(--teal);
+  color: var(--red);
 }
 
 .status-processing {
@@ -253,21 +255,21 @@ select {
 
 input:focus,
 select:focus {
-  border-color: var(--teal);
+  border-color: var(--red);
 }
 
-/* Native date-input calendar icon renders black-on-black in dark mode by
-   default — invert it so it's actually visible/clickable. */
+/* Native date-input calendar icon can render invisible against light
+   backgrounds depending on platform — keep it dark/visible explicitly. */
 input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1);
+  filter: none;
   cursor: pointer;
 }
 
 button {
   cursor: pointer;
-  border: 1px solid var(--teal);
-  background: var(--teal);
-  color: #04100f;
+  border: 1px solid var(--red);
+  background: var(--red);
+  color: #ffffff;
   font-weight: 700;
   font-size: 0.75rem;
   letter-spacing: 0.08em;
@@ -281,7 +283,7 @@ button:disabled {
 
 button.ghost {
   background: transparent;
-  color: var(--teal);
+  color: var(--red);
 }
 
 button.danger {
@@ -291,8 +293,8 @@ button.danger {
 }
 
 .error-box {
-  border: 1px solid rgba(245, 106, 106, 0.4);
-  background: rgba(245, 106, 106, 0.08);
+  border: 1px solid rgba(185, 28, 28, 0.35);
+  background: rgba(185, 28, 28, 0.06);
   color: var(--danger);
   padding: 0.6rem 0.8rem;
   font-size: 0.75rem;
@@ -320,14 +322,14 @@ button.danger {
 
 .panel {
   border: 1px solid var(--border);
-  background: rgba(10, 14, 20, 0.4);
+  background: var(--surface);
   padding: 1.25rem;
 }
 
 .panel-title {
   font-size: 0.65rem;
   letter-spacing: 0.1em;
-  color: var(--teal);
+  color: var(--red);
   text-transform: uppercase;
   margin: 0 0 1rem;
 }
