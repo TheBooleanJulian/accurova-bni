@@ -356,6 +356,17 @@
       nameField.appendChild(nameInput);
       frag.appendChild(nameField);
 
+      // Auto-fill the ID slug from Name, until the ID field is edited by
+      // hand — then leave it alone (so a deliberate custom slug sticks).
+      let idEditedManually = false;
+      idInput.addEventListener("input", () => {
+        idEditedManually = true;
+      });
+      nameInput.addEventListener("input", () => {
+        if (idEditedManually) return;
+        idInput.value = slugify(nameInput.value);
+      });
+
       const dateField = document.createElement("div");
       dateField.innerHTML = `<label class="field-label">Date</label>`;
       const dateInput = document.createElement("input");
@@ -458,6 +469,14 @@
         cover_position: draft.cover_position,
         image_count_override: draft.image_count_override ? Number(draft.image_count_override) : null,
       };
+    }
+
+    function slugify(str) {
+      return str
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
     }
 
     function escapeHtml(str) {

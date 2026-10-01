@@ -256,6 +256,13 @@ select:focus {
   border-color: var(--teal);
 }
 
+/* Native date-input calendar icon renders black-on-black in dark mode by
+   default — invert it so it's actually visible/clickable. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
 button {
   cursor: pointer;
   border: 1px solid var(--teal);
