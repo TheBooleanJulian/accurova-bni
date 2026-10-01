@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Accurova BNI — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/app.css" />
+</head>
+<body>
+  <div class="wrap" id="app">
+    <p class="loading">Loading&hellip;</p>
+  </div>
+
+  <script type="module">
+    import { supabase } from "./assets/supabase-client.js";
+    import { driveThumbUrl } from "./assets/luxsync.js";
+
+    const app = document.getElementById("app");
+
+    const SELECT_COLUMNS =
+      "id,name,gallery_date,status,drive_folder_id,cover_drive_file_id,external_url,cover_position,image_count_override";
+
+    const BLANK = {
+      id: "",
+      name: "",
+      gallery_date: "",
+      status: "online",
+      drive_folder_id: "",
+      cover_drive_file_id: "",
+      external_url: "",
+      cover_position: "center",
+      image_count_override: "",
+    };
+
+    let session;
+
+    supabase.auth.getSession().then(({ data }) => {
+      session = data.session;
+      render();
+    });
+    supabase.auth.onAuthStateChange((_event, s) => {
+      session = s;
+      render();
+    });
+
+    function render() {
+      app.innerHTML = "";
+      if (session === undefined) {
+        app.innerHTML = '<p class="loading">Loading&hellip;</p>';
+        return;
+      }
+      if (!session) {
+        renderSignIn();
+        return;
+      }
+      renderDashboard();
+    }
+
+    function renderSignIn() {
+      const shell = document.createElement("div");
+      shell.className = "admin-shell";
+      shell.innerHTML = `
+        <p class="eyebrow">Accurova &middot; BNI Admin</p>
+        <h1 style="margin-top:0.5rem;">Sign in</h1>
+        <div id="signin-error"></div>
+        <form id="signin-form">
+          <label class="field-label">Email</label>
+          <input type="email" id="signin-email" required autocomplete="username" />
+          <label class="field-label">Password</label>
+          <input type="password" id="signin-password" required autocomplete="current-password" />
+          <button type="submit" id="signin-submit" style="margin-top:1.5rem;width:100%;">Sign in</button>
+        </form>
+      `;
+      app.appendChild(shell);
+
+      const form = shell.querySelector("#signin-form");
+      const errorBox = shell.querySelector("#signin-error");
+      const submitBtn = shell.querySelector("#signin-submit");
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        errorBox.innerHTML = "";
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Signing in…";
+        const email = shell.querySelector("#signin-email").value;
+        const password = shell.querySelector("#signin-password").value;
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Sign in";
+        if (error) {
+          errorBox.innerHTML = `<p class="error-box">${escapeHtml(error.message)}</p>`;
+        }
+      });
+    }
+
+    function renderDashboard() {
+      const topbar = document.createElement("div");
+      topbar.className = "admin-topbar";
+      topbar.innerHTML = `
+        <div>
+          <p class="eyebrow">Accurova &middot; BNI Admin</p>
+          <h1 style="margin-top:0.3rem;font-size:1.5rem;">Gallery Dashboard</h1>
+        </div>
+        <div class="admin-user">
+          <span>${escapeHtml(session.user.email ?? "")}</span>
+          <button class="ghost" id="sign-out">Sign out</button>
+        </div>
+      `;
+      app.appendChild(topbar);
+      topbar.querySelector("#sign-out").addEventListener("click", () => supabase.auth.signOut());
+
+      const panel = document.createElement("div");
+      panel.className = "panel";
+      panel.innerHTML = `
+        <p class="panel-title">Add gallery</p>
+        <div id="create-error"></div>
+        <form id="create-form" class="form-grid"></form>
+      `;
+      app.appendChild(panel);
+
+      const createForm = panel.querySelector("#create-form");
+      createForm.appendChild(buildFieldset("create-", BLANK));
+      const addBtn = document.createElement("button");
+      addBtn.type = "submit";
+      addBtn.className = "full";
+      addBtn.textContent = "Add";
+      createForm.appendChild(addBtn);
+
+      createForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const errorBox = panel.querySelector("#create-error");
+        errorBox.innerHTML = "";
+        const draft = readFieldset("create-");
+        addBtn.disabled = true;
+        addBtn.textContent = "Saving…";
+        const { error } = await supabase.from("galleries").insert(toRow(draft));
+        addBtn.disabled = false;
+        addBtn.textContent = "Add";
+        if (error) {
+          errorBox.innerHTML = `<p class="error-box">${escapeHtml(error.message)}</p>`;
+          return;
+        }
+        createForm.reset();
+        loadRows();
+      });
+
+      const tableWrap = document.createElement("div");
+      tableWrap.id = "table-wrap";
+      tableWrap.innerHTML = '<p class="loading">Loading&hellip;</p>';
+      app.appendChild(tableWrap);
+
+      loadRows();
+    }
+
+    async function loadRows() {
+      const tableWrap = document.getElementById("table-wrap");
+      if (!tableWrap) return;
+      const { data, error } = await supabase
+        .from("galleries")
+        .select(SELECT_COLUMNS)
+        .order("gallery_date", { ascending: false });
+      if (error) {
+        tableWrap.innerHTML = `<p class="error-box">${escapeHtml(error.message)}</p>`;
+        return;
+      }
+      renderTable(data ?? []);
+    }
+
+    function renderTable(rows) {
+      const tableWrap = document.getElementById("table-wrap");
+      tableWrap.innerHTML = "";
+      const table = document.createElement("table");
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th>ID</th><th>Name</th><th>Date</th><th>Status</th><th>Drive folder</th>
+            <th>Cover file</th><th>External URL</th><th>Crop</th><th># override</th><th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      `;
+      const tbody = table.querySelector("tbody");
+
+      for (const row of rows) {
+        tbody.appendChild(renderRow(row));
+      }
+      tableWrap.appendChild(table);
+    }
+
+    function renderRow(row) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(row.id)}</td>
+        <td>${escapeHtml(row.name)}</td>
+        <td>${escapeHtml(row.gallery_date)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.drive_folder_id || "—")}</td>
+        <td>${escapeHtml(row.cover_drive_file_id || "—")}</td>
+        <td>${escapeHtml(row.external_url || "—")}</td>
+        <td>${escapeHtml(row.cover_position)}</td>
+        <td>${row.image_count_override ?? "—"}</td>
+        <td class="actions">
+          <button class="ghost edit-btn">Edit</button>
+          <button class="danger delete-btn">Delete</button>
+        </td>
+      `;
+      tr.querySelector(".edit-btn").addEventListener("click", () => renderEditRow(tr, row));
+      tr.querySelector(".delete-btn").addEventListener("click", async () => {
+        if (!window.confirm(`Delete gallery "${row.id}"? This cannot be undone.`)) return;
+        const { error } = await supabase.from("galleries").delete().eq("id", row.id);
+        if (error) {
+          window.alert(error.message);
+          return;
+        }
+        loadRows();
+      });
+      return tr;
+    }
+
+    function renderEditRow(tr, row) {
+      const draft = {
+        id: row.id,
+        name: row.name,
+        gallery_date: row.gallery_date,
+        status: row.status,
+        drive_folder_id: row.drive_folder_id || "",
+        cover_drive_file_id: row.cover_drive_file_id || "",
+        external_url: row.external_url || "",
+        cover_position: row.cover_position,
+        image_count_override: row.image_count_override ?? "",
+      };
+
+      tr.innerHTML = "";
+      const idTd = document.createElement("td");
+      idTd.textContent = row.id;
+      idTd.className = "mono";
+      tr.appendChild(idTd);
+
+      const fields = ["name", "gallery_date", "status", "drive_folder_id", "cover_drive_file_id", "external_url", "cover_position", "image_count_override"];
+      const inputs = {};
+      for (const field of fields) {
+        const td = document.createElement("td");
+        const el = buildFieldInput(field, draft[field]);
+        inputs[field] = el;
+        td.appendChild(el);
+        tr.appendChild(td);
+      }
+
+      const actionsTd = document.createElement("td");
+      actionsTd.className = "actions";
+      const saveBtn = document.createElement("button");
+      saveBtn.textContent = "Save";
+      const cancelBtn = document.createElement("button");
+      cancelBtn.className = "ghost";
+      cancelBtn.textContent = "Cancel";
+      actionsTd.appendChild(saveBtn);
+      actionsTd.appendChild(cancelBtn);
+      tr.appendChild(actionsTd);
+
+      cancelBtn.addEventListener("click", () => loadRows());
+      saveBtn.addEventListener("click", async () => {
+        const update = {
+          name: inputs.name.value,
+          gallery_date: inputs.gallery_date.value,
+          status: inputs.status.value,
+          drive_folder_id: inputs.drive_folder_id.value || null,
+          cover_drive_file_id: inputs.cover_drive_file_id.value || null,
+          external_url: inputs.external_url.value || null,
+          cover_position: inputs.cover_position.value,
+          image_count_override: inputs.image_count_override.value ? Number(inputs.image_count_override.value) : null,
+        };
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Saving…";
+        const { error } = await supabase.from("galleries").update(update).eq("id", row.id);
+        if (error) {
+          window.alert(error.message);
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Save";
+          return;
+        }
+        loadRows();
+      });
+    }
+
+    function buildFieldInput(field, value) {
+      if (field === "status") {
+        const select = document.createElement("select");
+        for (const opt of ["online", "processing", "archived"]) {
+          const o = document.createElement("option");
+          o.value = opt;
+          o.textContent = opt;
+          if (opt === value) o.selected = true;
+          select.appendChild(o);
+        }
+        return select;
+      }
+      if (field === "cover_position") {
+        const select = document.createElement("select");
+        for (const opt of ["center", "top", "bottom"]) {
+          const o = document.createElement("option");
+          o.value = opt;
+          o.textContent = opt;
+          if (opt === value) o.selected = true;
+          select.appendChild(o);
+        }
+        return select;
+      }
+      const input = document.createElement("input");
+      input.value = value ?? "";
+      if (field === "gallery_date") input.type = "date";
+      if (field === "image_count_override") input.type = "number";
+      if (field === "cover_drive_file_id") {
+        const wrap = document.createElement("div");
+        wrap.appendChild(input);
+        const preview = document.createElement("img");
+        preview.className = "cover-preview";
+        preview.hidden = true;
+        wrap.appendChild(preview);
+        input.addEventListener("input", () => updateCoverPreview(preview, input.value));
+        updateCoverPreview(preview, value);
+        wrap.valueOf = () => input.value;
+        Object.defineProperty(wrap, "value", { get: () => input.value });
+        return wrap;
+      }
+      return input;
+    }
+
+    function updateCoverPreview(img, fileId) {
+      if (!fileId) {
+        img.hidden = true;
+        img.src = "";
+        return;
+      }
+      img.src = driveThumbUrl(fileId);
+      img.hidden = false;
+    }
+
+    function buildFieldset(prefix, draft) {
+      const frag = document.createDocumentFragment();
+
+      const idField = document.createElement("div");
+      idField.innerHTML = `<label class="field-label">ID (slug)</label>`;
+      const idInput = document.createElement("input");
+      idInput.id = `${prefix}id`;
+      idInput.required = true;
+      idField.appendChild(idInput);
+      frag.appendChild(idField);
+
+      const nameField = document.createElement("div");
+      nameField.innerHTML = `<label class="field-label">Name</label>`;
+      const nameInput = document.createElement("input");
+      nameInput.id = `${prefix}name`;
+      nameInput.required = true;
+      nameField.appendChild(nameInput);
+      frag.appendChild(nameField);
+
+      const dateField = document.createElement("div");
+      dateField.innerHTML = `<label class="field-label">Date</label>`;
+      const dateInput = document.createElement("input");
+      dateInput.type = "date";
+      dateInput.id = `${prefix}gallery_date`;
+      dateInput.required = true;
+      dateField.appendChild(dateInput);
+      frag.appendChild(dateField);
+
+      const statusField = document.createElement("div");
+      statusField.innerHTML = `<label class="field-label">Status</label>`;
+      const statusSelect = document.createElement("select");
+      statusSelect.id = `${prefix}status`;
+      for (const opt of ["online", "processing", "archived"]) {
+        const o = document.createElement("option");
+        o.value = opt;
+        o.textContent = opt;
+        statusSelect.appendChild(o);
+      }
+      statusField.appendChild(statusSelect);
+      frag.appendChild(statusField);
+
+      const driveField = document.createElement("div");
+      driveField.innerHTML = `<label class="field-label">Drive folder ID</label>`;
+      const driveInput = document.createElement("input");
+      driveInput.id = `${prefix}drive_folder_id`;
+      driveInput.placeholder = "optional if not organized yet";
+      driveField.appendChild(driveInput);
+      frag.appendChild(driveField);
+
+      const coverField = document.createElement("div");
+      coverField.innerHTML = `<label class="field-label">Cover Drive file ID</label>`;
+      const coverInput = document.createElement("input");
+      coverInput.id = `${prefix}cover_drive_file_id`;
+      coverInput.placeholder = "optional";
+      coverField.appendChild(coverInput);
+      const coverPreview = document.createElement("img");
+      coverPreview.className = "cover-preview";
+      coverPreview.hidden = true;
+      coverField.appendChild(coverPreview);
+      coverInput.addEventListener("input", () => updateCoverPreview(coverPreview, coverInput.value));
+      frag.appendChild(coverField);
+
+      const extField = document.createElement("div");
+      extField.innerHTML = `<label class="field-label">External URL</label>`;
+      const extInput = document.createElement("input");
+      extInput.id = `${prefix}external_url`;
+      extInput.placeholder = "used until drive_folder_id is set";
+      extField.appendChild(extInput);
+      frag.appendChild(extField);
+
+      const cropField = document.createElement("div");
+      cropField.innerHTML = `<label class="field-label">Cover crop</label>`;
+      const cropSelect = document.createElement("select");
+      cropSelect.id = `${prefix}cover_position`;
+      for (const opt of ["center", "top", "bottom"]) {
+        const o = document.createElement("option");
+        o.value = opt;
+        o.textContent = opt;
+        cropSelect.appendChild(o);
+      }
+      cropField.appendChild(cropSelect);
+      frag.appendChild(cropField);
+
+      const countField = document.createElement("div");
+      countField.innerHTML = `<label class="field-label"># override</label>`;
+      const countInput = document.createElement("input");
+      countInput.type = "number";
+      countInput.id = `${prefix}image_count_override`;
+      countInput.placeholder = "only if no Drive folder";
+      countField.appendChild(countInput);
+      frag.appendChild(countField);
+
+      return frag;
+    }
+
+    function readFieldset(prefix) {
+      return {
+        id: document.getElementById(`${prefix}id`).value,
+        name: document.getElementById(`${prefix}name`).value,
+        gallery_date: document.getElementById(`${prefix}gallery_date`).value,
+        status: document.getElementById(`${prefix}status`).value,
+        drive_folder_id: document.getElementById(`${prefix}drive_folder_id`).value,
+        cover_drive_file_id: document.getElementById(`${prefix}cover_drive_file_id`).value,
+        external_url: document.getElementById(`${prefix}external_url`).value,
+        cover_position: document.getElementById(`${prefix}cover_position`).value,
+        image_count_override: document.getElementById(`${prefix}image_count_override`).value,
+      };
+    }
+
+    function toRow(draft) {
+      return {
+        id: draft.id,
+        name: draft.name,
+        gallery_date: draft.gallery_date,
+        status: draft.status,
+        drive_folder_id: draft.drive_folder_id || null,
+        cover_drive_file_id: draft.cover_drive_file_id || null,
+        external_url: draft.external_url || null,
+        cover_position: draft.cover_position,
+        image_count_override: draft.image_count_override ? Number(draft.image_count_override) : null,
+      };
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str ?? "";
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>

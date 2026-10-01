@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Accurova BNI — Gallery Archive</title>
+  <meta name="description" content="Search and browse every BNI event gallery." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/app.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="site-header">
+      <div>
+        <p class="eyebrow">Accurova &middot; BNI</p>
+        <h1>Gallery Archive</h1>
+        <p class="sub">Every BNI event gallery in one place — search by name to jump straight in.</p>
+      </div>
+      <div class="header-actions">
+        <a href="admin.html">Admin</a>
+      </div>
+    </header>
+
+    <div class="search-bar">
+      <input type="search" id="search" placeholder="Search galleries&hellip;" autocomplete="off" />
+    </div>
+
+    <p class="count-line" id="count-line">Loading&hellip;</p>
+
+    <div class="grid" id="grid"></div>
+    <p class="empty-state" id="empty-state" hidden></p>
+  </div>
+
+  <script type="module">
+    import { getAllGalleries } from "./assets/galleries.js";
+
+    const STATUS_LABEL = {
+      online: "Online",
+      processing: "Not yet indexed",
+      archived: "Archived",
+    };
+
+    const grid = document.getElementById("grid");
+    const countLine = document.getElementById("count-line");
+    const emptyState = document.getElementById("empty-state");
+    const searchInput = document.getElementById("search");
+
+    let galleries = [];
+
+    function render(list) {
+      grid.innerHTML = "";
+      countLine.textContent = `${list.length.toLocaleString()} GALLER${list.length === 1 ? "Y" : "IES"}`;
+      emptyState.hidden = list.length > 0;
+      if (list.length === 0) {
+        const q = searchInput.value.trim();
+        emptyState.textContent = q ? `No galleries match "${q}".` : "No galleries yet.";
+        return;
+      }
+
+      for (const g of list) {
+        const card = document.createElement("a");
+        card.className = "card";
+        card.href = g.url;
+        if (g.url.startsWith("http")) {
+          card.target = "_blank";
+          card.rel = "noopener";
+        }
+
+        const cover = document.createElement("div");
+        cover.className = "card-cover";
+        if (g.cover) {
+          cover.style.backgroundImage = `url('${g.cover}')`;
+          cover.style.backgroundPosition = g.coverPosition || "center";
+          cover.textContent = "";
+        } else {
+          cover.textContent = "NO COVER";
+        }
+
+        const body = document.createElement("div");
+        body.className = "card-body";
+
+        const title = document.createElement("p");
+        title.className = "card-title";
+        title.textContent = g.name;
+
+        const meta = document.createElement("p");
+        meta.className = "card-meta";
+        meta.textContent = g.imageCount > 0 ? `${g.date} · ${g.imageCount.toLocaleString()} images` : g.date;
+
+        const statusLine = document.createElement("p");
+        statusLine.className = `status-line status-${g.status}`;
+        const dot = document.createElement("span");
+        dot.className = "status-dot";
+        statusLine.appendChild(dot);
+        statusLine.appendChild(document.createTextNode(STATUS_LABEL[g.status] ?? g.status));
+
+        body.appendChild(title);
+        body.appendChild(meta);
+        body.appendChild(statusLine);
+        card.appendChild(cover);
+        card.appendChild(body);
+        grid.appendChild(card);
+      }
+    }
+
+    function applyFilter() {
+      const q = searchInput.value.trim().toLowerCase();
+      const filtered = q ? galleries.filter((g) => g.name.toLowerCase().includes(q)) : galleries;
+      render(filtered);
+    }
+
+    searchInput.addEventListener("input", applyFilter);
+
+    const params = new URLSearchParams(location.search);
+    if (params.get("q")) searchInput.value = params.get("q");
+
+    getAllGalleries()
+      .then((data) => {
+        galleries = data;
+        applyFilter();
+      })
+      .catch((err) => {
+        countLine.textContent = "Error loading galleries";
+        emptyState.hidden = false;
+        emptyState.textContent = err.message;
+        console.error(err);
+      });
+  </script>
+</body>
+</html>
