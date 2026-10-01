@@ -20,7 +20,7 @@
     const app = document.getElementById("app");
 
     const SELECT_COLUMNS =
-      "id,name,gallery_date,status,drive_folder_id,cover_drive_file_id,external_url,cover_position,image_count_override";
+      "id,name,gallery_date,status,drive_folder_id,cover_drive_file_id,external_url,cover_position,image_count_override,image_count_cache,image_count_updated_at";
 
     const BLANK = {
       id: "",
@@ -146,12 +146,70 @@
         loadRows();
       });
 
+      const toolbar = document.createElement("div");
+      toolbar.style.marginTop = "1.5rem";
+      const refreshAllBtn = document.createElement("button");
+      refreshAllBtn.className = "ghost";
+      refreshAllBtn.textContent = "Refresh all counts";
+      toolbar.appendChild(refreshAllBtn);
+      app.appendChild(toolbar);
+
+      refreshAllBtn.addEventListener("click", async () => {
+        refreshAllBtn.disabled = true;
+        refreshAllBtn.textContent = "Refreshing…";
+        await refreshAllCounts();
+        refreshAllBtn.disabled = false;
+        refreshAllBtn.textContent = "Refresh all counts";
+      });
+
       const tableWrap = document.createElement("div");
       tableWrap.id = "table-wrap";
       tableWrap.innerHTML = '<p class="loading">Loading&hellip;</p>';
       app.appendChild(tableWrap);
 
       loadRows();
+    }
+
+    // Counts are cached (image_count_cache), not fetched live on every page
+    // view — this and the per-row "Refresh" button are the only things that
+    // call LuxSync from admin.html. Concurrency capped at 4 to stay under
+    // LuxSync's /api/gallery rate limit (20/min) when refreshing many rows.
+    async function refreshAllCounts() {
+      const { data, error } = await supabase
+        .from("galleries")
+        .select("id,drive_folder_id")
+        .not("drive_folder_id", "is", null);
+      if (error) {
+        window.alert(error.message);
+        return;
+      }
+      const items = data ?? [];
+      let next = 0;
+
+      async function worker() {
+        while (next < items.length) {
+          const item = items[next++];
+          try {
+            await refreshGalleryCount(item.id, item.drive_folder_id);
+          } catch (err) {
+            console.error(`refresh count failed for gallery ${item.id}`, err);
+          }
+        }
+      }
+
+      await Promise.all(Array.from({ length: Math.min(4, items.length) }, worker));
+      loadRows();
+    }
+
+    async function refreshGalleryCount(id, driveFolderId) {
+      const { files } = await listDriveFolder(driveFolderId);
+      const updatedAt = new Date().toISOString();
+      const { error } = await supabase
+        .from("galleries")
+        .update({ image_count_cache: files.length, image_count_updated_at: updatedAt })
+        .eq("id", id);
+      if (error) throw error;
+      return { count: files.length, updatedAt };
     }
 
     async function loadRows() {
@@ -198,7 +256,7 @@
         <td>${escapeHtml(row.gallery_date)}</td>
         <td>${escapeHtml(row.status)}</td>
         <td>${escapeHtml(row.drive_folder_id || "—")}</td>
-        <td class="image-count">${row.drive_folder_id ? "…" : (row.image_count_override ?? "—")}</td>
+        <td class="image-count-cell"></td>
         <td>${escapeHtml(row.cover_drive_file_id || "—")}</td>
         <td>${escapeHtml(row.external_url || "—")}</td>
         <td>${escapeHtml(row.cover_position)}</td>
@@ -208,6 +266,7 @@
           <button class="danger delete-btn">Delete</button>
         </td>
       `;
+      renderImageCountCell(tr.querySelector(".image-count-cell"), row);
       tr.querySelector(".edit-btn").addEventListener("click", () => renderEditRow(tr, row));
       tr.querySelector(".delete-btn").addEventListener("click", async () => {
         if (!window.confirm(`Delete gallery "${row.id}"? This cannot be undone.`)) return;
@@ -218,18 +277,46 @@
         }
         loadRows();
       });
-      if (row.drive_folder_id) {
-        const countCell = tr.querySelector(".image-count");
-        listDriveFolder(row.drive_folder_id)
-          .then(({ files }) => {
-            countCell.textContent = files.length.toLocaleString();
-          })
-          .catch((err) => {
-            countCell.textContent = "error";
-            console.error(`image count fetch failed for gallery ${row.id}`, err);
-          });
-      }
       return tr;
+    }
+
+    // Shows the cached count (from the last "Refresh") plus a per-row
+    // refresh button for Drive-folder galleries. Non-Drive galleries just
+    // show their manual override — nothing to refresh.
+    function renderImageCountCell(cell, row) {
+      cell.innerHTML = "";
+      const countSpan = document.createElement("span");
+      countSpan.textContent = row.drive_folder_id ? (row.image_count_cache ?? "—") : (row.image_count_override ?? "—");
+      if (row.image_count_updated_at) {
+        countSpan.title = `Updated ${new Date(row.image_count_updated_at).toLocaleString()}`;
+      }
+      cell.appendChild(countSpan);
+
+      if (!row.drive_folder_id) return;
+
+      const refreshBtn = document.createElement("button");
+      refreshBtn.className = "ghost";
+      refreshBtn.textContent = "↻";
+      refreshBtn.title = "Refresh count";
+      refreshBtn.style.marginLeft = "0.4rem";
+      refreshBtn.style.padding = "0.15rem 0.4rem";
+      refreshBtn.addEventListener("click", async () => {
+        refreshBtn.disabled = true;
+        countSpan.textContent = "…";
+        try {
+          const { count, updatedAt } = await refreshGalleryCount(row.id, row.drive_folder_id);
+          row.image_count_cache = count;
+          row.image_count_updated_at = updatedAt;
+          countSpan.textContent = count.toLocaleString();
+          countSpan.title = `Updated ${new Date(updatedAt).toLocaleString()}`;
+        } catch (err) {
+          countSpan.textContent = "error";
+          console.error(`refresh count failed for gallery ${row.id}`, err);
+        } finally {
+          refreshBtn.disabled = false;
+        }
+      });
+      cell.appendChild(refreshBtn);
     }
 
     function renderEditRow(tr, row) {
@@ -262,21 +349,11 @@
         tr.appendChild(td);
       }
 
-      // Images isn't a stored/editable field — it's the live Drive folder
-      // count, same as the read-only row, just not updatable here.
+      // Images isn't a stored/editable field — it's the cached Drive folder
+      // count, same as the read-only row (refresh it there, not here).
       const imageCountTd = document.createElement("td");
-      imageCountTd.textContent = row.drive_folder_id ? "…" : "—";
+      imageCountTd.textContent = row.drive_folder_id ? (row.image_count_cache ?? "—") : (row.image_count_override ?? "—");
       tr.appendChild(imageCountTd);
-      if (row.drive_folder_id) {
-        listDriveFolder(row.drive_folder_id)
-          .then(({ files }) => {
-            imageCountTd.textContent = files.length.toLocaleString();
-          })
-          .catch((err) => {
-            imageCountTd.textContent = "error";
-            console.error(`image count fetch failed for gallery ${row.id}`, err);
-          });
-      }
 
       for (const field of fieldsAfterImages) {
         const td = document.createElement("td");

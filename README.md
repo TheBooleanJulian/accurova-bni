@@ -17,21 +17,19 @@ system — a deliberate per-project deviation.
 - **`index.html`** — public hub. Loads every row from the `galleries`
   Supabase table, renders a searchable grid of cards, and links each card to
   its LuxSync gallery page (lightbox/download built in) or an external URL.
-  For galleries backed by a Drive folder, the image count loads in the
-  background after the initial render (4-at-a-time) and fills in per card as
-  it arrives, rather than blocking the page on it.
+  Image counts come straight from `image_count_cache` — index.html makes no
+  LuxSync calls itself (see "Photo counts" below).
 - **`admin.html`** — password-gated dashboard (Supabase Auth) with a form to
   add galleries and a table to edit/delete existing ones. The ID field
-  auto-fills a slug from Name until edited by hand, and the table's Images
-  column shows each Drive-backed gallery's live photo count.
+  auto-fills a slug from Name until edited by hand. The table's Images
+  column shows each Drive-backed gallery's cached count with a per-row
+  refresh button, plus a "Refresh all counts" button above the table.
 - **`assets/luxsync.js`** — talks to the shared [LuxSync](https://github.com/TheBooleanJulian/luxsync-v3)
-  instance for thumbnails, the gallery page URL, and (via `listDriveFolder`)
-  live image counts. This hub never stores or serves photo bytes itself.
+  instance for thumbnails, the gallery page URL, and (via `listDriveFolder`,
+  called only from admin.html) image counts. This hub never stores or
+  serves photo bytes itself.
 - **`assets/supabase-client.js` / `assets/galleries.js`** — thin Supabase
   client + row-to-view mapping, mirroring `xymiku-site/lib/data.ts`.
-  `galleries.js` also exports `loadImageCounts()`, the concurrency-capped
-  background fetch index.html uses (LuxSync's `/api/gallery` is rate-limited
-  to 20/min, hence the cap rather than firing every request at once).
 - **`supabase-schema.sql`** — the `galleries` table + row-level-security
   policies (public read, admin-only write).
 
@@ -74,6 +72,24 @@ Via `admin.html`, sign in and fill in the "Add gallery" form:
 
 Once a Drive folder ID is set, the card always links to that folder's
 LuxSync gallery page, regardless of what External URL holds.
+
+## Photo counts
+
+Counts for Drive-folder galleries are **cached, not live** — `image_count_cache`
+on the `galleries` row, refreshed only when an admin clicks "Refresh"
+(per-row) or "Refresh all counts" in `admin.html`. The public hub and the
+rest of the admin table just read that cached value; nothing on `index.html`
+calls LuxSync.
+
+This is a deliberate choice over fetching live on every page view: LuxSync's
+`/api/gallery` is rate-limited to 20/min, and a few concurrent visitors to a
+live-fetching hub could exhaust that shared budget on their own. The
+tradeoff is that counts go stale between refreshes — bump them by hand after
+adding photos to a gallery's Drive folder, or periodically if you want to
+stay current without thinking about it (no automatic/scheduled refresh is
+wired up; that would need a service-role credential with table write
+access, deliberately not added here to keep this a credential-light static
+site — see git history if that tradeoff changes).
 
 ## Deployment
 

@@ -29,6 +29,11 @@ create table if not exists galleries (
   -- Manual image count for galleries with no drive_folder_id — there's no
   -- API to count those automatically. Leave unset to hide the count.
   image_count_override int,
+  -- Cached LuxSync image count for Drive-folder galleries, refreshed only
+  -- via admin.html's "Refresh" button (not live on every page view — see
+  -- README for why). Null means "never refreshed yet".
+  image_count_cache int,
+  image_count_updated_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -46,3 +51,10 @@ create policy "public read galleries" on galleries for select using (true);
 create policy "admin write galleries" on galleries for all
   using (auth.jwt() ->> 'email' = 'ADMIN_EMAIL')
   with check (auth.jwt() ->> 'email' = 'ADMIN_EMAIL');
+
+-- Migration: image_count_cache/image_count_updated_at were added after the
+-- initial release. Re-run this (Database -> SQL Editor) if admin.html fails
+-- with "column galleries.image_count_cache does not exist" — safe to run
+-- even if the columns are already there.
+alter table galleries add column if not exists image_count_cache int;
+alter table galleries add column if not exists image_count_updated_at timestamptz;

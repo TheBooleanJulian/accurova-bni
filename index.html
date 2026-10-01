@@ -33,7 +33,7 @@
   </div>
 
   <script type="module">
-    import { getAllGalleries, loadImageCounts } from "./assets/galleries.js";
+    import { getAllGalleries } from "./assets/galleries.js";
 
     const STATUS_LABEL = {
       online: "Online",
@@ -47,7 +47,6 @@
     const searchInput = document.getElementById("search");
 
     let galleries = [];
-    let metaElements = new Map();
 
     function metaText(g) {
       return g.imageCount ? `${g.date} · ${g.imageCount.toLocaleString()} images` : g.date;
@@ -55,7 +54,6 @@
 
     function render(list) {
       grid.innerHTML = "";
-      metaElements = new Map();
       countLine.textContent = `${list.length.toLocaleString()} GALLER${list.length === 1 ? "Y" : "IES"}`;
       emptyState.hidden = list.length > 0;
       if (list.length === 0) {
@@ -93,7 +91,6 @@
         const meta = document.createElement("p");
         meta.className = "card-meta";
         meta.textContent = metaText(g);
-        metaElements.set(g.id, meta);
 
         const statusLine = document.createElement("p");
         statusLine.className = `status-line status-${g.status}`;
@@ -126,12 +123,6 @@
       .then((data) => {
         galleries = data;
         applyFilter();
-        return loadImageCounts(galleries, (id, count) => {
-          const g = galleries.find((gallery) => gallery.id === id);
-          if (g) g.imageCount = count;
-          const meta = metaElements.get(id);
-          if (meta) meta.textContent = metaText(g);
-        });
       })
       .catch((err) => {
         countLine.textContent = "Error loading galleries";
