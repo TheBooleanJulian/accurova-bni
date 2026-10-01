@@ -68,9 +68,18 @@ LuxSync gallery page, regardless of what External URL holds.
 
 Zeabur Git-connected service, tracking `main`. `config.js` is gitignored
 (it's per-deployment and the repo should stay portable), so instead
-`scripts/write-config.js` runs as the Zeabur build step (`npm run build`,
-see `package.json`) and writes `config.js` from this service's environment
-variables right before the static files are served.
+`scripts/build.js` runs as the Zeabur build step (`npm run build`, see
+`package.json`) and copies `index.html`/`admin.html`/`assets/` into
+`dist/`, writing `dist/config.js` from this service's environment
+variables.
+
+`zbpack.json`'s `output_dir: "dist"` is required, not optional — Zeabur's
+builder (zbpack) treats any repo with a `package.json` as a Node.js app by
+default, and without a declared `output_dir` it tries to run `dist/` as a
+server rather than serve it as static files (this broke the first version
+of this build step: a `package.json` with no `output_dir` deployed as a
+Node server with no entry point and crash-looped). `output_dir` is what
+keeps it in static file mode, served by Caddy like before.
 
 Set these in the Zeabur dashboard (service → Variables):
 
