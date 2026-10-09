@@ -50,6 +50,16 @@ a {
   padding: 2.5rem 1.25rem 4rem;
 }
 
+.page-banner {
+  display: block;
+}
+
+.page-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 header.site-header {
   display: flex;
   align-items: baseline;
@@ -236,6 +246,17 @@ h1 {
 }
 
 .site-footer a:hover {
+  text-decoration: underline;
+}
+
+.site-footer .admin-link {
+  color: var(--mute);
+  opacity: 0.5;
+}
+
+.site-footer .admin-link:hover {
+  color: var(--mute);
+  opacity: 1;
   text-decoration: underline;
 }
 
