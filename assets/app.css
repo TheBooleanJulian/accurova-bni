@@ -226,6 +226,28 @@ h1 {
   background: var(--mute);
 }
 
+.status-online .status-dot {
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0% {
+    box-shadow: 0 0 0 0 rgba(228, 0, 43, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(228, 0, 43, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(228, 0, 43, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-online .status-dot {
+    animation: none;
+  }
+}
+
 .empty-state {
   color: var(--mute);
   font-size: 0.9rem;
