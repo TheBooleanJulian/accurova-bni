@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Accurova BNI — Admin</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/app.css" />
@@ -68,6 +70,7 @@
       const shell = document.createElement("div");
       shell.className = "admin-shell";
       shell.innerHTML = `
+        <a class="back-home" href="index.html">&larr; Back to homepage</a>
         <p class="eyebrow">Accurova &middot; BNI Admin</p>
         <h1 style="margin-top:0.5rem;">Sign in</h1>
         <div id="signin-error"></div>
@@ -106,7 +109,8 @@
       topbar.className = "admin-topbar";
       topbar.innerHTML = `
         <div>
-          <p class="eyebrow">Accurova &middot; BNI Admin</p>
+          <a class="back-home" href="index.html">&larr; Back to homepage</a>
+          <p class="eyebrow" style="margin-top:0.6rem;">Accurova &middot; BNI Admin</p>
           <h1 style="margin-top:0.3rem;font-size:1.5rem;">Gallery Dashboard</h1>
         </div>
         <div class="admin-user">

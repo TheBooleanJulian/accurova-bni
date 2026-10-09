@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Accurova BNI — Gallery Archive</title>
   <meta name="description" content="Search and browse every BNI event gallery." />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Accurova BNI Photo Gallery Archive" />
+  <meta property="og:description" content="Every BNI event gallery shot by Accurova (Julian Cheung) in one place — searchable by event, date or venue." />
+  <meta property="og:url" content="https://bni.accurova.com/" />
+  <meta property="og:image" content="https://bni.accurova.com/assets/Accurova-Photography-Archive-Banner.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Accurova BNI Photo Gallery Archive" />
+  <meta name="twitter:description" content="Every BNI event gallery shot by Accurova (Julian Cheung) in one place — searchable by event, date or venue." />
+  <meta name="twitter:image" content="https://bni.accurova.com/assets/Accurova-Photography-Archive-Banner.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/app.css" />
@@ -18,7 +28,7 @@
       <div>
         <p class="eyebrow">Accurova &middot; BNI</p>
         <h1>Accurova BNI Photo Gallery Archive</h1>
-        <p class="sub">Every BNI event gallery shot by Accurova (Julian) in one place — search by name to jump straight in.</p>
+        <p class="sub">Every BNI event gallery shot by Accurova (Julian Cheung) in one place — searchable by event, date or venue.</p>
       </div>
     </header>
 
@@ -28,7 +38,11 @@
 
     <p class="count-line" id="count-line">Loading&hellip;</p>
 
-    <div class="grid" id="grid"></div>
+    <div class="grid" id="grid">
+      <div class="card-cover skeleton" style="aspect-ratio:4/3;"></div>
+      <div class="card-cover skeleton" style="aspect-ratio:4/3;"></div>
+      <div class="card-cover skeleton" style="aspect-ratio:4/3;"></div>
+    </div>
     <p class="empty-state" id="empty-state" hidden></p>
 
     <footer class="site-footer">Built by <a href="https://thebooleanjulian.dev" target="_blank" rel="noopener">TheBooleanJulian</a> &middot; <a class="admin-link" href="admin.html">Admin</a></footer>
@@ -68,6 +82,7 @@
         const card = document.createElement("a");
         card.className = "card";
         card.href = g.url;
+        card.setAttribute("aria-label", `${g.name} — ${metaText(g)} — ${STATUS_LABEL[g.status] ?? g.status}`);
         if (g.url.startsWith("http")) {
           card.target = "_blank";
           card.rel = "noopener";
@@ -76,10 +91,21 @@
         const cover = document.createElement("div");
         cover.className = "card-cover";
         if (g.cover) {
-          cover.style.backgroundImage = `url('${g.cover}')`;
-          cover.style.backgroundPosition = g.coverPosition || "center";
-          cover.textContent = "";
+          cover.classList.add("skeleton");
+          const img = document.createElement("img");
+          img.src = g.cover;
+          img.alt = `Cover photo for ${g.name}`;
+          img.loading = "lazy";
+          img.decoding = "async";
+          img.style.objectPosition = g.coverPosition || "center";
+          img.addEventListener("load", () => {
+            img.classList.add("loaded");
+            cover.classList.remove("skeleton");
+          });
+          cover.appendChild(img);
         } else {
+          cover.setAttribute("role", "img");
+          cover.setAttribute("aria-label", "No cover photo");
           cover.textContent = "NO COVER";
         }
 
