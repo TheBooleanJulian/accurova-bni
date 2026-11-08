@@ -4,7 +4,7 @@ import { supabase } from "./supabase-client.js";
 import { driveThumbUrl, driveGalleryUrl } from "./luxsync.js";
 
 const SELECT_COLUMNS =
-  "id,name,gallery_date,status,drive_folder_id,cover_drive_file_id,external_url,cover_position,image_count_override";
+  "id,name,gallery_date,status,drive_folder_id,cover_drive_file_id,external_url,cover_position,image_count_override,image_count_cache";
 
 function formatDate(isoDate) {
   const d = new Date(`${isoDate}T00:00:00Z`);
@@ -18,7 +18,10 @@ function toView(row) {
     id: row.id,
     name: row.name,
     date: formatDate(row.gallery_date),
-    imageCount: row.drive_folder_id ? 0 : (row.image_count_override ?? 0),
+    // image_count_cache is only ever refreshed via admin.html's "Refresh"
+    // button (not fetched live here) — see README for why. 0/null both
+    // just mean "don't show a count", no need to distinguish them.
+    imageCount: row.drive_folder_id ? (row.image_count_cache ?? 0) : (row.image_count_override ?? 0),
     status: row.status,
     cover: row.cover_drive_file_id ? driveThumbUrl(row.cover_drive_file_id) : "",
     coverPosition: row.cover_position,
@@ -26,9 +29,6 @@ function toView(row) {
   };
 }
 
-// Doesn't call LuxSync per row (rate-limited to 20/min) — fine for a hub
-// page, not meant for precise live image counts. Admin panel shows the raw
-// row instead.
 export async function getAllGalleries() {
   const { data, error } = await supabase
     .from("galleries")
